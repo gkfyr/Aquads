@@ -1,0 +1,32 @@
+{
+  "name": "@aquads/sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/aquads.umd.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/aquads.umd.js"
+    },
+    "./umd": "./dist/aquads.umd.js"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "build:watch": "rollup -c -w"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.8",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-typescript": "^11.1.6",
+    "rollup": "^4.22.4",
+    "rollup-plugin-terser": "^7.0.2",
+    "typescript": "^5.5.4",
+    "tslib": "^2.6.2"
+  },
+  "dependencies": {
+    "@aquads/shared": "workspace:*"
+  }
+}

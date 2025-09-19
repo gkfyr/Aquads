@@ -1,0 +1,10 @@
+[package]
+name = "sui-ads"
+edition = "2024.alpha"
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/devnet" }
+
+[addresses]
+ad_market = "0x0"
+

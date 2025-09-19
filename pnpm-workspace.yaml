@@ -1,0 +1,6 @@
+packages:
+  - "contracts/*"
+  - "indexer"
+  - "packages/*"
+  - "packages/sdk-react"
+  - "apps/*"

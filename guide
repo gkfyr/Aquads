@@ -1,0 +1,127 @@
+- Node.js 18+와 pnpm 설치: node -v, pnpm -v
+- Sui CLI 설치/로그인 후 testnet 설정/자금 충전
+    - sui client --version, sui client switch --env testnet
+    - 퍼블리셔/광고주 키(둘 다) 지갑에 SUI 보유 필요
+
+1) .env 설정
+
+- .env.example를 .env로 복사
+- 필수 값 채우기:
+    - PUBLISHER_PRIVATE_KEY=ed25519:<base64 or hex>
+    - ADVERTISER_PRIVATE_KEY=ed25519:<base64 or hex>
+    - SUI_MODULE_NAME=ad_market 그대로 유지
+    - SUI_RPC_URL 기본값 그대로 가능
+- 배포 후 SUI_PACKAGE_ID는 뒤에서 채움
+
+bach -> base64
+node --input-type=module -e "import {decodeSuiPrivateKey} from '@mysten/sui/cryptography';
+const v=process.argv[1];
+const {scheme, secretKey}=decodeSuiPrivateKey(v);
+if(scheme!=='ED25519') throw new Error('Needs ED25519, got '+scheme);
+console.log('base64:', Buffer.from(secretKey).toString('base64'));
+console.log('hex:', Buffer.from(secretKey).toString('hex'));" \
+suiprivkey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+
+
+2) 의존성 설치
+
+- pnpm i
+- Prisma 초기화:
+    - pnpm --filter @sui-ads/indexer prisma:generate
+    - pnpm --filter @sui-ads/indexer prisma:migrate (초기 마이그레이션 생성)
+
+3) 컨트랙트 배포
+
+- pnpm deploy:contracts
+- 출력된 패키지 ID를 .env의 SUI_PACKAGE_ID에 복사
+
+4) 서비스 기동
+
+- 한 번에 실행(추천): pnpm dev
+    - 포함: Indexer/API(8787), SDK build watch, Admin(5173), Publisher demo(5174)
+- 또는 개별 실행:
+    - pnpm dev:indexer
+    - pnpm --filter @sui-ads/sdk build:watch
+    - pnpm --filter @sui-ads/admin dev
+    - pnpm --filter @sui-ads/publisher-demo dev
+
+5) Admin에서 슬롯 생성
+
+- 브라우저에서 http://localhost:5173 열기
+- Create Slot:
+    - Width/Height: 예) 300/250
+    - Domain Hash: 16진(hex) 입력(예: 0x + sha256(domain))
+    - Reserve Price: 최소 입찰가(mist 단위) 입력
+- 생성 후 슬롯 객체 ID 복사
+
+6) Publisher Demo에 슬롯 반영
+
+- apps/publisher-demo/index.html에서 0xSLOT를 실제 슬롯 ID로 교체
+    - <div data-slot-id="0xSLOT">와 SDK 스크립트의 data-slot="0xSLOT" 둘 다 변경
+    - 저장하면 Vite가 자동 리로드
+- 또는 브라우저 콘솔에서 즉시 테스트:
+    - window.SuiAds.mount('#slot1', { slotId: '0x...실제슬롯ID' })
+
+7) 입찰/락 + 크리에이티브 업로드/앵커
+
+- Admin “Slots” 목록에서 대상 슬롯의:
+    - Bid: mist 금액 입력(최소: 직전가 또는 리저브 가격 대비 +10% 이상)
+    - Lock: 금액 + 기간(초) 입력(예: 3600)
+    - Upload + Anchor: 이미지 업로드 → 자동으로 메타 생성 → “Anchor” 트랜잭션 실행
+- Publisher 데모 페이지(5174)에서 배너 이미지가 즉시 표시/교체됨
+
+8) 확인 포인트
+
+- Indexer/API: http://localhost:8787/health → {ok:true}
+- 현재 슬롯 상태: GET http://localhost:8787/api/slot/<슬롯ID>/current
+- 업로드된 메타 JSON: http://localhost:8787/uploads/<sha256>.json
+- SDK 정책검증은 기본 완화: apps/publisher-demo/index.html에 window.__SEAL_DISABLE = true 설정되어 있음
+
+9) 시드 스크립트(선택)
+
+- Indexer가 켜진 상태에서 pnpm seed 실행 → 샘플 슬롯 1개 생성 시도
+
+문제 해결 가이드(요약)
+
+- 트랜잭션 실패: .env의 SUI_PACKAGE_ID/키값 확인, 퍼블리셔/광고주 계정에 SUI 보유 확인.
+- SDK가 플레이스홀더만 보임: /api/slot/:id/current의 latestMetaCid 확인, /uploads에 메타 JSON 존재 확인.
+- 인덱싱 지연: 이벤트 폴링 2초 주기(몇 초 기다렸다 새로고침).
+
+
+
+
+
+
+
+
+리셋 가이드 
+
+아래 순서로 진행하면 SQLite DB를 깨끗하게 초기화할 수 있습니다.
+
+기본(권장)
+
+- 프로세스 중지: pnpm dev 실행 중이면 먼저 종료
+- Prisma 리셋: pnpm --filter @aquads/indexer prisma:reset
+- 재시작: pnpm dev
+
+수동(파일 제거)
+
+- 프로세스 중지: pnpm dev 종료
+- DB 파일 삭제: rm -f indexer/prisma/data.db
+- Prisma 재준비:
+    - pnpm --filter @aquads/indexer prisma:generate
+    - pnpm --filter @aquads/indexer prisma:deploy
+- 재시작: pnpm dev
+
+선택(업로드 파일도 초기화)
+
+- 업로드 정리: rm -rf indexer/uploads/*
+- 참고: 업로드 정리는 로컬 mock 파일만 지웁니다. 온체인 상태는 유지됩니다.
+
+확인
+
+- 헬스 체크: curl http://127.0.0.1:8787/health → {"ok":true}
+- 슬롯 목록: http://127.0.0.1:8787/api/slots → 빈 배열이면 초기화 성공
+
+참고

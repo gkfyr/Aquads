@@ -1,0 +1,25 @@
+{
+  "name": "aquads",
+  "private": true,
+  "workspaces": [
+    "contracts/*",
+    "indexer",
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "predev": "pnpm --filter @aquads/indexer prisma:generate && pnpm --filter @aquads/indexer prisma:deploy",
+    "dev": "concurrently -n INDEXER,SDK,ADMIN,PUB,BLOG \"pnpm dev:indexer\" \"wait-on -s http-get://127.0.0.1:8787/health && pnpm --filter @aquads/sdk build:watch\" \"wait-on -s http-get://127.0.0.1:8787/health && pnpm --filter @aquads/admin dev\" \"wait-on -s http-get://127.0.0.1:8787/health && pnpm --filter @aquads/publisher-demo dev\" \"wait-on -s http-get://127.0.0.1:8787/health && pnpm --filter @aquads/demo-blog dev\"",
+    "build": "pnpm -r build",
+    "dev:indexer": "pnpm --filter @aquads/indexer dev",
+    "deploy:contracts": "tsx scripts/deploy.ts",
+    "seed": "tsx scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@mysten/sui": "^1.38.0",
+    "@mysten/sui.js": "^0.53.0",
+    "concurrently": "^9.0.0",
+    "tsx": "^4.0.0",
+    "wait-on": "^7.0.1"
+  }
+}

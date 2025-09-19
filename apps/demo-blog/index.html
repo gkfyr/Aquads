@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>My Dev Blog — Aquads Demo</title>
+    <style>
+      :root {
+        --fg: #e5f2ff;
+        --muted: #9fb4cc;
+        --bg: #0b1020;
+        --surface: rgba(17, 26, 46, 0.7);
+        --card: rgba(17, 26, 46, 0.7);
+        --border: rgba(255, 255, 255, 0.08);
+        --brand-from: #1e9bff;
+        --brand-to: #0e7fdd;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui;
+        background: radial-gradient(800px 400px at 10% -10%, rgba(30, 155, 255, 0.35), rgba(11, 61, 105, 0) 60%),
+          radial-gradient(600px 300px at 110% -20%, rgba(14, 127, 221, 0.3), rgba(11, 61, 105, 0) 60%), var(--bg);
+        color: var(--fg);
+        margin: 0;
+      }
+      header {
+        background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+        border-bottom: 1px solid var(--border);
+        color: #e6f6ff;
+      }
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 16px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        gap: 24px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+      .post {
+        padding: 16px;
+      }
+      .post h2 {
+        margin: 0.2rem 0;
+      }
+      .post p {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .ad {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px dashed var(--border);
+        color: var(--muted);
+      }
+      .slot-label {
+        font-size: 12px;
+        color: var(--muted);
+        margin: 8px 0;
+      }
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .toolbar {
+        position: fixed;
+        right: 16px;
+        bottom: 16px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        backdrop-filter: blur(8px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      }
+      .toolbar label {
+        display: block;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 8px;
+      }
+      .toolbar input {
+        width: 260px;
+        padding: 8px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.05);
+        color: var(--fg);
+        border-radius: 8px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--fg);
+        cursor: pointer;
+      }
+      .btn.primary {
+        background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+        border-color: transparent;
+        color: #fff;
+      }
+      .banner {
+        width: 100%;
+        height: 100px;
+      }
+      .rect {
+        width: 300px;
+        height: 250px;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+        .sidebar {
+          order: -1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="container" style="display: flex; align-items: center; justify-content: space-between; gap: 16px">
+        <div style="display: flex; align-items: center; gap: 12px">
+          <strong>My Dev Blog</strong>
+          <span style="font-size: 12px; color: var(--muted)">Aquads Demo</span>
+        </div>
+        <div style="display: flex; gap: 8px">
+          <a class="btn" href="http://localhost:5173/" target="_blank">Marketplace</a>
+          <a class="btn" href="http://localhost:5173/admin" target="_blank">Admin</a>
+        </div>
+      </div>
+    </header>
+    <main class="container" style="padding-top: 20px">
+      <div class="grid">
+        <section>
+          <div class="slot-label">Top Banner</div>
+          <div id="ad-banner" class="card ad banner" data-slot-id="" data-responsive></div>
+          <article class="card post" style="margin-top: 16px">
+            <h2>Building on Sui: A Dev’s Journey</h2>
+            <p>
+              Welcome to my dev blog! In this post, I share how I built a simple ad marketplace with Sui Move, a Node.js
+              indexer, and a tiny browser SDK. It’s fast to iterate and fun to demo.
+            </p>
+            <p>
+              The publisher embeds a single script, and advertisers can bid, lock display periods, and update creatives
+              that render instantly. With a mock Walrus storage and Seal verification, the demo runs locally in minutes.
+            </p>
+          </article>
+          <article class="card post" style="margin-top: 16px">
+            <h2>Deep Dive: Events and Indexing</h2>
+            <p>
+              Sui events power the realtime flow: SlotCreated, Rented/Outbid, BuyoutLocked, and CreativeUpdated. A
+              simple poller stores state into SQLite. The SDK fetches /api/slot/:id/current to render the latest.
+              Qualcomm has long been synonymous with system-on-chip (SoC) leadership, particularly in the smartphone
+              sector. From the early Snapdragon mobile processors that defined the Android flagship experience to the
+              AI-driven, 5G-capable platforms of today, the company has consistently balanced performance, power
+              efficiency, and connectivity in ways that shape entire product categories. The latest announcement of the
+              Snapdragon W5+ Gen 2 and W5 Gen 2 platforms signals Qualcomm’s determination to bring that same formula to
+              wearables — a segment still struggling to reach the mass market beyond a few high-profile successes like
+              the Apple Watch. This launch marks more than just a generational upgrade. It’s an effort to address some
+              of the foundational barriers that have kept wearables from reaching their full potential. John Kehrli,
+              Qualcomm’s Senior Director of Product Management for wearables, framed the move as the culmination of
+              years of incremental learning. “With W5+ Gen 2, we’re taking what we’ve mastered in smartphones —
+              integrating performance, efficiency, and connectivity into one seamless platform — and bringing it to a
+              category that’s still searching for its defining moment,” he said. Qualcomm SoC Expertise Targets
+              Wearables Qualcomm’s DNA is rooted in complex SoC integration. The company’s engineers understand that the
+              magic of a great device is not in maxing out any single component, but in orchestrating CPU, GPU,
+              connectivity, AI, and power management into a tightly optimized whole. That’s what W5+ Gen 2 and W5 Gen 2
+              aim to deliver. Qualcomm Snapdragon W5+ Gen 2 and W5 Gen 2 wearable platforms with NB-NTN satellite,
+              machine learning GPS, and RF front end. Qualcomm’s Snapdragon W5+ Gen 2 and W5 Gen 2 introduce NB-NTN
+              satellite connectivity, machine learning GPS accuracy, and an optimized RF front end for next-generation
+              wearables. (Image Credit: Qualcomm) The chips are built on a 4nm process, offering higher performance per
+              watt and enabling OEMs to shrink form factors without sacrificing capability. The addition of Location
+              Machine Learning 3.0 improves GPS accuracy by up to 50% in dense urban environments — a critical feature
+              for runners, cyclists, and anyone using a smartwatch in cities or rugged terrain. The optimized RF front
+              end contributes to an approximately 20% smaller footprint and lower power consumption, giving
+              manufacturers more flexibility in design. The headline feature, however, is NB-NTN satellite support — a
+              first for the wearable industry. This technology, powered by Qualcomm’s partnership with Skylo, allows for
+              two-way emergency messaging without cellular or Wi-Fi coverage. Kehrli explained why that matters: “People
+              want their wearables to be trusted companions, not just fitness trackers. Being able to send an SOS from
+              anywhere changes the value proposition entirely.” Wearables Still Struggle With Mass Adoption Despite
+              Qualcomm’s strong showing in wearable hardware, the Android-based smartwatch ecosystem has struggled to
+              match the Apple Watch’s mass-market penetration. The reasons are multifaceted. Wear OS has improved, but
+              historically it has lagged behind watchOS in polish and integration. Beyond software, the simple reality
+              is that many consumers live in the Apple ecosystem, and most wearables powered by Qualcomm silicon are not
+              designed to integrate deeply with iOS devices. That’s a significant barrier because wearable adoption is
+              closely tied to seamless pairing with a user’s primary smartphone. Apple leverages that lock-in
+              masterfully; if you’re an iPhone user, the Apple Watch is the default choice. For Qualcomm’s OEM partners,
+              cracking that wall means either targeting Android users exclusively — which limits the addressable market
+              — or finding ways to make cross-platform experiences compelling enough to tempt a switch. Kehrli
+              acknowledged the challenge without sugarcoating it: “We’re not trying to out-Apple Apple. Our focus is on
+              making the Android and multi-device ecosystem as compelling as possible so that the choice isn’t just by
+              default — it’s because the experience is better for that user.” W5+ Gen 2 Aims To Solve Wearable Barriers
+              The W5+ Gen 2 platform addresses several long-standing friction points in the wearable category. Battery
+              life has been a recurring complaint for smartwatches, especially those running Wear OS. By combining a
+              high-efficiency 4nm main processor with a 22nm always-on co-processor (in the W5+ variant), Qualcomm can
+              offload low-power tasks and extend time between charges without compromising responsiveness.
+            </p>
+          </article>
+        </section>
+        <aside class="sidebar">
+          <div class="slot-label">Sidebar</div>
+          <div id="ad-rect" class="card ad rect" data-slot-id="" data-responsive></div>
+          <div class="card post" style="padding: 12px">
+            <h3 style="margin: 8px 0">About this demo</h3>
+            <p style="font-size: 14px; color: var(--muted)">
+              This is a fake blog layout with two ad slots powered by Aquads SDK.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- Config toolbar -->
+    <div class="toolbar">
+      <div style="font-weight: 600; font-size: 13px">Configure Slot IDs</div>
+      <label>Banner slotId</label>
+      <input id="inpBanner" placeholder="0x..." />
+      <label>Sidebar slotId</label>
+      <input id="inpRect" placeholder="0x..." />
+      <div style="display: flex; gap: 8px; margin-top: 10px">
+        <button class="btn" id="btnLoad">Load</button>
+        <button class="btn primary" id="btnSave">Save</button>
+      </div>
+      <div style="margin-top: 8px">
+        <small style="color: var(--muted)">Tip: you can also use ?banner=0x..&rect=0x..</small>
+      </div>
+    </div>
+
+    <script>
+      window.__SEAL_DISABLE = true; // allow all
+      (function initConfig() {
+        const p = new URLSearchParams(location.search);
+        const banner = p.get("banner") || localStorage.getItem("suiads.blog.banner") || "";
+        const rect = p.get("rect") || localStorage.getItem("suiads.blog.rect") || "";
+        document.getElementById("ad-banner").dataset.slotId = banner;
+        document.getElementById("ad-rect").dataset.slotId = rect;
+        document.getElementById("inpBanner").value = banner;
+        document.getElementById("inpRect").value = rect;
+      })();
+    </script>
+    <script src="/sdk/aquads.umd.js"></script>
+    <script>
+      function mountAll() {
+        const b = document.getElementById("ad-banner").dataset.slotId;
+        const r = document.getElementById("ad-rect").dataset.slotId;
+        if (b) window.Aquads.mount("#ad-banner", { slotId: b });
+        if (r) window.Aquads.mount("#ad-rect", { slotId: r });
+      }
+      mountAll();
+      document.getElementById("btnLoad").onclick = () => {
+        document.getElementById("ad-banner").dataset.slotId = document.getElementById("inpBanner").value.trim();
+        document.getElementById("ad-rect").dataset.slotId = document.getElementById("inpRect").value.trim();
+        mountAll();
+      };
+      document.getElementById("btnSave").onclick = () => {
+        const b = document.getElementById("inpBanner").value.trim();
+        const r = document.getElementById("inpRect").value.trim();
+        localStorage.setItem("suiads.blog.banner", b);
+        localStorage.setItem("suiads.blog.rect", r);
+        document.getElementById("ad-banner").dataset.slotId = b;
+        document.getElementById("ad-rect").dataset.slotId = r;
+        mountAll();
+      };
+    </script>
+  </body>
+</html>

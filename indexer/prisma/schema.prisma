@@ -1,0 +1,30 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./data.db"
+}
+
+model Slot {
+  id              String   @id
+  publisher       String
+  width           Int
+  height          Int
+  domain_hash     String
+  reserve_price   BigInt
+  current_renter  String?
+  rental_expiry   BigInt
+  last_price      BigInt
+  latest_meta_cid String?
+  created_at      BigInt
+}
+
+model Event {
+  id      String @id
+  slot_id String
+  type    String
+  data    String
+  ts      BigInt
+}

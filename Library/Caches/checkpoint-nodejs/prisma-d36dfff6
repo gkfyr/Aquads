@@ -1,0 +1,53 @@
+{
+  "last_reminder": 1758162841553,
+  "cached_at": 1758162841431,
+  "version": "5.22.0",
+  "cli_path": "/Users/harok/Codes/Private/sui-adsense/indexer/node_modules/prisma/build/index.js",
+  "output": {
+    "product": "prisma",
+    "previous_version": "5.22.0",
+    "checkpoint_version": 4,
+    "local_timestamp_without_timezone": "2025-09-18T11:34:00Z",
+    "current_version": "6.16.2",
+    "current_release_date": 1758027262,
+    "client_event_id": "a96c25ee-aa13-44a7-816f-983f32b844d3",
+    "current_download_url": "https://github.com/prisma/prisma",
+    "package": "prisma",
+    "release_tag": "latest",
+    "install_command": "npm install --save-dev prisma",
+    "schema_providers": [
+      "sqlite"
+    ],
+    "schema_preview_features": [],
+    "schema_generators_providers": [
+      "prisma-client-js"
+    ],
+    "current_changelog_url": "https://github.com/prisma/prisma",
+    "outdated": true,
+    "project_website": "https://prisma.io",
+    "alerts": []
+  },
+  "product": "prisma",
+  "cli_install_type": "local",
+  "local_timestamp": "2025-09-18T11:48:44+09:00",
+  "project_hash": "63bde4da",
+  "cli_path_hash": "d36dfff6",
+  "endpoint": "https://checkpoint.prisma.io",
+  "arch": "arm64",
+  "os": "darwin",
+  "node_version": "v20.14.0",
+  "command": "migrate deploy",
+  "schema_providers": [
+    "sqlite"
+  ],
+  "schema_preview_features": [],
+  "schema_generators_providers": [
+    "prisma-client-js"
+  ],
+  "cache_file": "/Users/harok/Codes/Private/sui-adsense/Library/Caches/checkpoint-nodejs/prisma-d36dfff6",
+  "cache_duration": 43200000,
+  "remind_duration": 172800000,
+  "timeout": 5000,
+  "unref": true,
+  "child_path": "/Users/harok/Codes/Private/sui-adsense/node_modules/.pnpm/prisma@5.22.0/node_modules/prisma/build/child"
+}

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Publisher Demo</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --border: rgba(255,255,255,0.08);
+        --fg: #e5f2ff;
+        --muted: #9fb4cc;
+        --brand-from: #1e9bff;
+        --brand-to: #0e7fdd;
+      }
+      body {
+        font-family: Inter, ui-sans-serif, system-ui;
+        padding: 16px;
+        color: var(--fg);
+        background:
+          radial-gradient(800px 400px at 10% -10%, rgba(30,155,255,0.35), rgba(11,61,105,0) 60%),
+          radial-gradient(600px 300px at 110% -20%, rgba(14,127,221,0.3), rgba(11,61,105,0) 60%),
+          var(--bg);
+      }
+      h4 { color: var(--muted); }
+      .slot {
+        border: 1px dashed var(--border);
+        width: 300px;
+        height: 250px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255,255,255,0.04);
+        border-radius: 12px;
+        backdrop-filter: blur(6px);
+      }
+    </style>
+  </head>
+  <body>
+    <h4>AD by Aquads</h4>
+    <div id="slot1" class="slot" data-slot-id=""></div>
+    <script>
+      window.__SEAL_DISABLE = true; // allow all
+      (function () {
+        const params = new URLSearchParams(location.search);
+        const slotId = params.get("slotId") || params.get("slot") || localStorage.getItem("suiads.lastSlotId") || "";
+        if (slotId) {
+          document.getElementById("slot1").dataset.slotId = slotId;
+          localStorage.setItem("suiads.lastSlotId", slotId);
+        }
+      })();
+    </script>
+    <script src="/sdk/aquads.umd.js"></script>
+    <script>
+      const el = document.getElementById("slot1");
+      const sid = el.dataset.slotId || document.currentScript?.getAttribute("data-slot") || "";
+      if (sid) window.Aquads.mount("#slot1", { slotId: sid });
+    </script>
+  </body>
+</html>
