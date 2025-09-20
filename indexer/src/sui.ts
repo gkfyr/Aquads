@@ -87,7 +87,7 @@ export async function startIndexer(prisma: PrismaClient) {
         width: Number(data.width),
         height: Number(data.height),
         domain_hash: String(data.domain_hash),
-        // reserve_price not emitted by event in current Move; keep existing
+        reserve_price: BigInt(String((data as any).reserve_price ?? 0)),
         created_at: ts,
       });
     } else if (typeName === "Rented") {

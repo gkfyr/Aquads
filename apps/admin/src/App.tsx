@@ -4,6 +4,7 @@ import AdminPage from './pages/AdminPage'
 import SlotDetailPage from './pages/SlotDetailPage'
 import MyPage from './pages/MyPage'
 import LandingPage from './pages/LandingPage'
+import SwapPage from './pages/SwapPage'
 
 export default function AppRouter() {
   return (
@@ -12,6 +13,7 @@ export default function AppRouter() {
         <Route path="/" element={<MarketPage />} />
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/swap" element={<SwapPage />} />
         <Route path="/slot/:id" element={<SlotDetailPage />} />
         <Route path="/wallet" element={<MyPage />} />
         <Route path="/wallet/:address" element={<MyPage />} />

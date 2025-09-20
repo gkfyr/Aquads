@@ -249,12 +249,25 @@
       window.__SEAL_DISABLE = true; // allow all
       (function initConfig() {
         const p = new URLSearchParams(location.search);
-        const banner = p.get("banner") || localStorage.getItem("suiads.blog.banner") || "";
-        const rect = p.get("rect") || localStorage.getItem("suiads.blog.rect") || "";
-        document.getElementById("ad-banner").dataset.slotId = banner;
-        document.getElementById("ad-rect").dataset.slotId = rect;
-        document.getElementById("inpBanner").value = banner;
-        document.getElementById("inpRect").value = rect;
+        const pick = (keys, storeKeys = []) => {
+          for (const k of keys) {
+            const v = (p.get(k) || '').trim();
+            if (v) return v;
+          }
+          for (const sk of storeKeys) {
+            const v = (localStorage.getItem(sk) || '').trim();
+            if (v) return v;
+          }
+          return '';
+        };
+        const banner = pick(['banner', 'slot', 'slotId', 'b'], ['aquads.blog.banner', 'suiads.blog.banner']);
+        const rect = pick(['rect', 'slot2', 'r'], ['aquads.blog.rect', 'suiads.blog.rect']);
+        const elB = document.getElementById('ad-banner');
+        const elR = document.getElementById('ad-rect');
+        if (elB) elB.dataset.slotId = banner;
+        if (elR) elR.dataset.slotId = rect;
+        document.getElementById('inpBanner').value = banner;
+        document.getElementById('inpRect').value = rect;
       })();
     </script>
     <script src="/sdk/aquads.umd.js"></script>
@@ -274,8 +287,11 @@
       document.getElementById("btnSave").onclick = () => {
         const b = document.getElementById("inpBanner").value.trim();
         const r = document.getElementById("inpRect").value.trim();
+        // store under both legacy and new keys for compatibility
         localStorage.setItem("suiads.blog.banner", b);
         localStorage.setItem("suiads.blog.rect", r);
+        localStorage.setItem("aquads.blog.banner", b);
+        localStorage.setItem("aquads.blog.rect", r);
         document.getElementById("ad-banner").dataset.slotId = b;
         document.getElementById("ad-rect").dataset.slotId = r;
         mountAll();

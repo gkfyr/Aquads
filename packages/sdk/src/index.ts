@@ -91,16 +91,28 @@ export async function mount(el: HTMLElement, slotId: string) {
     };
     el.replaceChildren(container);
   } else {
-    const img = new Image();
-    img.src = walrusToHttp((meta as any).img_cid);
-    img.style.width = "100%";
-    img.style.height = "100%";
-    img.style.objectFit = "cover";
     const container = document.createElement("div");
     container.style.position = "relative";
     container.style.width = "100%";
     container.style.height = "100%";
-    container.appendChild(img);
+    function renderImg(cid: string) {
+      const img = new Image();
+      img.src = walrusToHttp(cid);
+      img.style.width = "100%";
+      img.style.height = "100%";
+      img.style.objectFit = "cover";
+      img.onload = () => {
+        img.onclick = () => {
+          fetch(`${API_BASE}/api/track/click`, { method: "POST", body: JSON.stringify({ slotId, url: meta.landing_url }) }).catch(() => {});
+          window.location.href = meta.landing_url;
+        };
+      };
+      img.onerror = () => {
+        renderPlaceholder(el, "Image failed to load");
+      };
+      container.replaceChildren(img);
+    }
+    renderImg((meta as any).img_cid);
     const hideLabel = (window as any).__AQUADS_HIDE_LABEL === true || (window as any).__SUI_AD_HIDE_LABEL === true;
     if (!hideLabel) {
       const badge = document.createElement("div");
@@ -117,18 +129,28 @@ export async function mount(el: HTMLElement, slotId: string) {
       badge.style.userSelect = "none";
       container.appendChild(badge);
     }
-    img.onload = () => {
-      img.onclick = () => {
-        fetch(`${API_BASE}/api/track/click`, {
-          method: "POST",
-          body: JSON.stringify({ slotId, url: meta.landing_url }),
-        }).catch(() => {});
-        window.location.href = meta.landing_url;
-      };
-    };
-    img.onerror = () => {
-      renderPlaceholder(el, "Image failed to load");
-    };
+    // Rotate creatives if multiple and unlocked (fetch meta -> img_cid)
+    try {
+      const list = await fetch(`${API_BASE}/api/slot/${slotId}/creatives`).then(r => r.json());
+      const unlocked = !s.expiry || s.expiry === 0;
+      const metas: string[] = Array.isArray(list) ? list.map((e: any) => String(e.metaCid || '')) : [];
+      const imgs: string[] = [];
+      // include current first
+      if ((meta as any).img_cid) imgs.push((meta as any).img_cid);
+      for (const mcid of metas) {
+        try {
+          const m = await fetchWalrusJSON(mcid);
+          if (m && (m as any).img_cid && !imgs.includes((m as any).img_cid)) imgs.push((m as any).img_cid);
+        } catch {}
+      }
+      let idx = 0;
+      if (unlocked && imgs.length > 1) {
+        setInterval(() => {
+          idx = (idx + 1) % imgs.length;
+          renderImg(imgs[idx]);
+        }, 5000);
+      }
+    } catch {}
     el.replaceChildren(container);
   }
   // Start viewability tracking once creative is in DOM

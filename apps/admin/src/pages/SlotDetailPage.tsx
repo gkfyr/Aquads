@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import NavBar from "../components/NavBar";
 import { CopyIcon, ExternalLinkIcon } from "../components/icons";
-import { useSignAndExecuteTransaction } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { TransactionBlock } from "@mysten/sui.js/transactions";
 
 async function j<T>(url: string, init?: RequestInit): Promise<T> {
@@ -21,6 +21,32 @@ function fmtSui(mistStr?: string | null) {
   } catch {
     return "0 SUI";
   }
+}
+
+function fmtSuiApproxFromMistStr(mistStr?: string | null) {
+  try {
+    const n = BigInt(mistStr || '0');
+    const whole = Number(n) / 1_000_000_000;
+    return `${whole.toFixed(4)} SUI`;
+  } catch { return '0 SUI'; }
+}
+function mistToSuiString(mistStr?: string | null) {
+  try {
+    const n = BigInt(mistStr || '0');
+    const intPart = n / 1_000_000_000n;
+    const frac = n % 1_000_000_000n;
+    const fracStr = frac.toString().padStart(9, '0').replace(/0+$/, '');
+    return fracStr ? `${intPart}.${fracStr}` : `${intPart}`;
+  } catch { return '0'; }
+}
+function suiToMist(suiStr: string) {
+  const s = (suiStr || '').trim();
+  if (!s) return '0';
+  if (!/^\d*(?:\.)?\d*$/.test(s)) throw new Error('Invalid SUI amount');
+  const [intPart, fracPartRaw = ''] = s.split('.');
+  const frac = (fracPartRaw + '000000000').slice(0, 9); // pad to 9
+  const mist = BigInt(intPart || '0') * 1_000_000_000n + BigInt(frac || '0');
+  return mist.toString();
 }
 
 function short(addr?: string | null) {
@@ -68,32 +94,40 @@ export default function SlotDetailPage() {
   const [creative, setCreative] = useState<any>(null);
   const [history, setHistory] = useState<any[]>([]);
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string; network?: string } | null>(null);
+  const account = useCurrentAccount();
+  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string; network?: string; protocolId?: string } | null>(null);
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [purchaseAmount, setPurchaseAmount] = useState("");
   const [purchaseLanding, setPurchaseLanding] = useState("https://example.com");
   const [purchaseFile, setPurchaseFile] = useState<File | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+  const [completeOpen, setCompleteOpen] = useState(false);
 
-  async function load() {
-    const s = await j<any>(`/api/slot/${id}/current`);
-    setState(s);
+  const [detailError, setDetailError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  async function load(attempt = 1) {
     try {
-      setCreative(await j<any>(`/api/slot/${id}/creative/current`));
-    } catch {
-      setCreative(null);
-    }
-    try {
-      setHistory(await j<any[]>(`/api/slot/${id}/creatives`));
-    } catch {
-      setHistory([]);
+      setLoading(true)
+      const s = await j<any>(`/api/slot/${id}/current`)
+      setState(s)
+      setDetailError(null)
+      try { setCreative(await j<any>(`/api/slot/${id}/creative/current`)) } catch { setCreative(null) }
+      try { setHistory(await j<any[]>(`/api/slot/${id}/creatives`)) } catch { setHistory([]) }
+    } catch (e: any) {
+      const msg = e?.message || 'Failed to load slot'
+      setDetailError(msg)
+      // Poll a few times — indexer may need a moment to ingest the event
+      if (attempt < 5) setTimeout(() => load(attempt + 1), 1500)
+    } finally {
+      setLoading(false)
     }
   }
   useEffect(() => {
     load();
     fetch("/api/config")
       .then((r) => r.json())
-      .then((c) => setCfg({ packageId: c.packageId, moduleName: c.moduleName, network: c.network }))
+      .then((c) => setCfg({ packageId: c.packageId, moduleName: c.moduleName, network: c.network, protocolId: c.protocolId || '' }))
       .catch(() => {});
   }, [id]);
 
@@ -102,18 +136,19 @@ export default function SlotDetailPage() {
   }
   const minAmountMist = (() => {
     try {
-      const lastMist = state?.lastPrice || "0";
-      const last = BigInt(lastMist);
-      const base = last > 0n ? last : 0n;
-      const min = base + (base * 10n) / 100n;
+      const last = BigInt(state?.lastPrice || '0');
+      const reserve = BigInt(((state?.slot as any)?.reserve_price ?? '0'));
+      let base = last === 0n ? reserve : last;
+      // Fallback for brand new slot where reserve might be missing in indexer yet
+      if (base === 0n) base = 10n; // enforce first-bid minimum 10 mist
+      const min = base + (base * 10n) / 100n; // base + 10%
       return min.toString();
-    } catch {
-      return "0";
-    }
+    } catch { return '10'; }
   })();
+  const minAmountSui = mistToSuiString(minAmountMist);
 
   const onPurchaseWithCreative = () => {
-    setPurchaseAmount(minAmountMist);
+    setPurchaseAmount(minAmountSui);
     setPurchaseLanding("https://example.com");
     setPurchaseFile(null);
     setPurchaseOpen(true);
@@ -129,11 +164,12 @@ export default function SlotDetailPage() {
         alert("Please select an image");
         return;
       }
-      const amount = String(purchaseAmount || "0");
-      if (!/^[0-9]+$/.test(amount)) {
-        alert("Amount must be an integer (mist)");
+      const amountSui = String(purchaseAmount || "0");
+      if (!/^\d*(?:\.)?\d*$/.test(amountSui)) {
+        alert("Amount must be a number (SUI)");
         return;
       }
+      const amount = suiToMist(amountSui);
       setPurchasing(true);
       // Upload image
       const form = new FormData();
@@ -149,10 +185,14 @@ export default function SlotDetailPage() {
         return;
       }
       const up = await uploadResp.json();
-      // Bid
+      // Bid (prefer with_protocol if available)
       const tx = new TransactionBlock();
       const [pay] = tx.splitCoins(tx.gas, [tx.pure(String(amount))]);
-      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(String(id)), pay] });
+      if (cfg.protocolId) {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid_with_protocol`, arguments: [tx.object(cfg.protocolId), tx.object(String(id)), pay] });
+      } else {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(String(id)), pay] });
+      }
       await signAndExecute({ transaction: tx.serialize(), options: { showEffects: true } });
       // Anchor creative
       const tx2 = new TransactionBlock();
@@ -163,6 +203,7 @@ export default function SlotDetailPage() {
       await signAndExecute({ transaction: tx2.serialize(), options: { showEffects: true } });
       await load();
       setPurchaseOpen(false);
+      setCompleteOpen(true);
     } catch (e: any) {
       alert(e?.message || "Failed to purchase");
     } finally {
@@ -180,6 +221,11 @@ export default function SlotDetailPage() {
     <div className="min-h-full font-[Inter]">
       <NavBar />
       <main className="mx-auto max-w-5xl px-6 py-6 grid gap-6 lg:grid-cols-2">
+        {!state && (
+          <div className="lg:col-span-2 card p-4 text-sm">
+            {loading ? 'Loading slot…' : detailError ? `Not found yet. ${detailError}` : 'Loading…'}
+          </div>
+        )}
         <section className="card overflow-hidden">
           <div className="aspect-video bg-white/5 flex items-center justify-center relative">
             {creative?.imgUrl ? (
@@ -228,13 +274,31 @@ export default function SlotDetailPage() {
             <div>
               Slot ID: <span className="font-mono break-all">{id}</span>
             </div>
-            <div className="flex gap-2 pt-2">
-              <button className="btn-primary" onClick={onPurchaseWithCreative}>
-                Purchase
-              </button>
-              <button className="btn-outline" onClick={onVisit}>
-                Visit website
-              </button>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <button className="btn-primary" onClick={onPurchaseWithCreative}>Purchase</button>
+              <button className="btn-outline" onClick={onVisit}>Visit website</button>
+              {account?.address?.toLowerCase() === state?.slot?.publisher?.toLowerCase() && (
+                <button className="btn-outline" onClick={async () => {
+                  try {
+                    if (!cfg) return;
+                    const tx = new TransactionBlock();
+                    tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::cancel_by_publisher`, arguments: [tx.object(String(id))] });
+                    await signAndExecute({ transaction: tx.serialize(), options: { showEffects: true } });
+                    await load();
+                  } catch (e:any) { alert(e?.message || 'Cancel failed') }
+                }}>Cancel (Publisher)</button>
+              )}
+              {account?.address?.toLowerCase() === state?.renter?.toLowerCase() && (
+                <button className="btn-outline" onClick={async () => {
+                  try {
+                    if (!cfg) return;
+                    const tx = new TransactionBlock();
+                    tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::cancel_by_advertiser`, arguments: [tx.object(String(id))] });
+                    await signAndExecute({ transaction: tx.serialize(), options: { showEffects: true } });
+                    await load();
+                  } catch (e:any) { alert(e?.message || 'Cancel failed') }
+                }}>Cancel (Advertiser)</button>
+              )}
             </div>
           </div>
         </section>
@@ -303,6 +367,22 @@ export default function SlotDetailPage() {
                 <div>{formatDateFromSeconds(state?.expiry)}</div>
               </div>
             ) : null}
+            {account?.address?.toLowerCase() === state?.slot?.publisher?.toLowerCase() && (
+              <div className="flex items-center justify-between">
+                <div className="text-slate-400">Actions</div>
+                <div className="flex gap-2">
+                  <button className="btn-outline" onClick={async () => {
+                    try {
+                      if (!cfg) return;
+                      const tx = new TransactionBlock();
+                      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::reset_to_placeholder`, arguments: [tx.object(String(id))] });
+                      await signAndExecute({ transaction: tx.serialize(), options: { showEffects: true } });
+                      await load();
+                    } catch (e:any) { alert(e?.message || 'Reset failed') }
+                  }}>Reset creative</button>
+                </div>
+              </div>
+            )}
           </div>
         </section>
         <section className="card p-4">
@@ -317,6 +397,19 @@ export default function SlotDetailPage() {
           </div>
         </section>
       </main>
+      {completeOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCompleteOpen(false)}>
+          <div className="card max-w-md w-full m-4 p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold mb-2">Completed</div>
+            <div className="text-sm text-slate-300 mb-3">Purchase has been completed successfully.</div>
+            <div className="flex gap-2">
+              <a className="btn-primary" href={`http://localhost:5175?slotId=${id}`} target="_blank" rel="noreferrer">Open Blog Demo</a>
+              <a className="btn-outline" href={`/wallet`} >Go to My Page</a>
+              <button className="btn-outline" onClick={() => setCompleteOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
       {purchaseOpen && (
         <div
           className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
@@ -331,15 +424,23 @@ export default function SlotDetailPage() {
             </div>
             <div className="grid gap-3">
               <div>
-                <label className="label">Amount (mist)</label>
+                <label className="label">Amount (SUI)</label>
                 <input
                   className="input"
-                  inputMode="numeric"
+                  inputMode="decimal"
                   value={purchaseAmount}
-                  onChange={(e) => setPurchaseAmount(e.target.value.replace(/[^0-9]/g, ""))}
-                  placeholder={minAmountMist}
+                  onChange={(e) => setPurchaseAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                  placeholder={minAmountSui}
                 />
-                <div className="text-xs text-slate-500 mt-1">Suggested minimum: {minAmountMist}</div>
+                <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+                  <span>
+                    Minimum required: <span className="text-slate-300 font-medium">{minAmountSui} SUI</span>
+                  </span>
+                  <button type="button" className="btn-outline !px-2 !py-1" onClick={() => setPurchaseAmount(minAmountSui)}>Use min</button>
+                </div>
+                {Number(state?.lastPrice || '0') === 0 && (
+                  <div className="text-xs text-amber-300 mt-1">First bid hint: at least 0.000000010 SUI + 10%</div>
+                )}
               </div>
               <div>
                 <label className="label">Creative Image</label>

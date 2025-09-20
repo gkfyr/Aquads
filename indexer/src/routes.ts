@@ -55,6 +55,19 @@ function savePagesMap(map: Record<string, string>) {
   fs.writeFileSync(pagesMapPath, JSON.stringify(map, null, 2));
 }
 
+// Simple claims ledger (hackathon): track claimed amounts per slot
+const claimsPath = path.join(uploadsRoot, 'claims.json');
+function loadClaims(): Record<string, { amountMist: string; ts: number }[]> {
+  try {
+    if (fs.existsSync(claimsPath)) return JSON.parse(fs.readFileSync(claimsPath, 'utf8'));
+  } catch {}
+  return {};
+}
+function saveClaims(map: Record<string, { amountMist: string; ts: number }[]>) {
+  fs.mkdirSync(uploadsRoot, { recursive: true });
+  fs.writeFileSync(claimsPath, JSON.stringify(map, null, 2));
+}
+
 function metaCidToPaths(metaCid: string) {
   // For mock://sha256-<hash>, meta JSON is /uploads/<hash>.json
   // and image inside meta points to mock://sha256-<imgHash> => /uploads/sha256-<imgHash>
@@ -175,8 +188,22 @@ async function ensureSharedObject(client: SuiClient, id: string) {
 
 router.get("/api/slot/:id/current", async (req, res) => {
   const { id } = req.params;
-  const slot = await prisma.slot.findUnique({ where: { id } });
+  let slot = await prisma.slot.findUnique({ where: { id } });
   if (!slot) return res.status(404).json({ error: "Not found" });
+  // Fallback: fetch reserve_price from on-chain object if missing (older events schema)
+  try {
+    if (!slot.reserve_price || String(slot.reserve_price) === '0') {
+      const client = getClient();
+      const obj: any = await client.getObject({ id, options: { showContent: true } });
+      const fields = (obj as any)?.data?.content?.fields as any;
+      const rp = fields?.reserve_price;
+      if (rp != null) {
+        const asStr = typeof rp === 'string' ? rp : Array.isArray(rp) ? Buffer.from(rp).toString('utf8') : String(rp);
+        await prisma.slot.update({ where: { id }, data: { reserve_price: BigInt(asStr) } }).catch(() => {});
+        slot = await prisma.slot.findUnique({ where: { id } }) as any;
+      }
+    }
+  } catch {}
   const pages = loadPagesMap();
   const pageUrl = pages[id] || null;
   res.json({
@@ -195,6 +222,7 @@ router.get('/api/config', (_req, res) => {
     packageId: process.env.SUI_PACKAGE_ID || '',
     moduleName: process.env.SUI_MODULE_NAME || 'ad_market',
     network: process.env.SUI_NETWORK || 'testnet',
+    protocolId: process.env.SUI_PROTOCOL_ID || process.env.PROTOCOL_ID || '',
   });
 });
 
@@ -244,6 +272,55 @@ router.get("/api/slot/:id/creatives", async (req, res) => {
   } catch (e) {
     console.error("creative list error", e);
     res.status(500).json({ error: "failed" });
+  }
+});
+
+// Finance metrics per slot — hackathon linear vesting over 30 days based on Rented/BuyoutLocked event ts
+router.get('/api/slot/:id/finance', async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const events = await prisma.event.findMany({ where: { slot_id: id, type: { in: ['Rented', 'BuyoutLocked'] } }, orderBy: { ts: 'asc' } });
+    const now = Math.floor(Date.now() / 1000);
+    const vestSec = 30 * 86400;
+    const claims = loadClaims();
+    const claimedList = claims[id] || [];
+    const totalClaimed = claimedList.reduce((acc, c) => acc + BigInt(c.amountMist || '0'), 0n);
+    let total = 0n;
+    let claimable = 0n;
+    for (const ev of events) {
+      const data = typeof ev.data === 'string' ? JSON.parse(ev.data) : (ev.data as any);
+      const amt = BigInt(String(data.price ?? data.amount ?? '0'));
+      total += amt;
+      const ts = Number(ev.ts || 0);
+      const passed = Math.max(0, Math.min(vestSec, now - ts));
+      const vested = (amt * BigInt(passed)) / BigInt(vestSec);
+      claimable += vested;
+    }
+    if (claimable < totalClaimed) claimable = totalClaimed; // guard
+    const available = claimable - totalClaimed;
+    res.json({ totalMist: total.toString(), claimableMist: claimable.toString(), claimedMist: totalClaimed.toString(), availableMist: available.toString(), vestDays: 30 });
+  } catch (e) {
+    res.status(500).json({ error: 'failed' });
+  }
+});
+
+router.post('/api/slot/:id/claim', express.json(), async (req, res) => {
+  try {
+    const id = String(req.params.id);
+    const { amountMist } = req.body as { amountMist: string };
+    if (!amountMist) return res.status(400).json({ error: 'amountMist required' });
+    const finance: any = await (await fetch(`http://localhost:${process.env.PORT || 8787}/api/slot/${id}/finance`)).json();
+    const available = BigInt(finance.availableMist || '0');
+    const reqAmt = BigInt(String(amountMist));
+    if (reqAmt <= 0n || reqAmt > available) return res.status(400).json({ error: 'invalid amount' });
+    const claims = loadClaims();
+    const list = claims[id] || [];
+    list.push({ amountMist: reqAmt.toString(), ts: Math.floor(Date.now() / 1000) });
+    claims[id] = list;
+    saveClaims(claims);
+    res.json({ ok: true, claimedMist: reqAmt.toString() });
+  } catch (e) {
+    res.status(500).json({ error: 'failed' });
   }
 });
 

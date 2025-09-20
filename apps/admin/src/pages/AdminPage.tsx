@@ -31,7 +31,7 @@ export default function AdminPage() {
   const [pageUrl, setPageUrl] = useState("");
   const account = useCurrentAccount();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
-  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string } | null>(null);
+  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string; protocolId?: string } | null>(null);
 
   function normalizeHost(host: string) {
     try {
@@ -87,7 +87,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     reload();
-    j('/api/config').then((c: any) => setCfg({ packageId: c.packageId, moduleName: c.moduleName })).catch(() => {});
+    j('/api/config').then((c: any) => setCfg({ packageId: c.packageId, moduleName: c.moduleName, protocolId: c.protocolId || '' })).catch(() => {});
   }, []);
 
   const onCreate = async (e: React.FormEvent) => {
@@ -169,7 +169,11 @@ export default function AdminPage() {
     if (!cfg) { alert('Config not loaded'); return; }
     const tx = new TransactionBlock();
     const [pay] = tx.splitCoins(tx.gas, [tx.pure(String(amount))]);
-    tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(slotId), pay] });
+    if (cfg.protocolId) {
+      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid_with_protocol`, arguments: [tx.object(cfg.protocolId), tx.object(slotId), pay] });
+    } else {
+      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(slotId), pay] });
+    }
     const res = await signAndExecute({
       transaction: tx.serialize(),
       options: { showEffects: true, showEvents: true, showObjectChanges: true },
@@ -185,7 +189,11 @@ export default function AdminPage() {
     if (!cfg) { alert('Config not loaded'); return; }
     const tx = new TransactionBlock();
     const [pay] = tx.splitCoins(tx.gas, [tx.pure(String(amount))]);
-    tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental`, arguments: [tx.object(slotId), pay, tx.pure(Number(secs))] });
+    if (cfg.protocolId) {
+      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental_with_protocol`, arguments: [tx.object(cfg.protocolId), tx.object(slotId), pay, tx.pure(Number(secs))] });
+    } else {
+      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental`, arguments: [tx.object(slotId), pay, tx.pure(Number(secs))] });
+    }
     const res = await signAndExecute({
       transaction: tx.serialize(),
       options: { showEffects: true, showEvents: true, showObjectChanges: true },

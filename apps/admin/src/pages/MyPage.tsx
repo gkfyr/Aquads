@@ -150,7 +150,7 @@ export default function MyPage() {
   const location = useLocation()
   const account = useCurrentAccount()
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction()
-  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string; network: string } | null>(null)
+  const [cfg, setCfg] = useState<{ packageId: string; moduleName: string; network: string; protocolId?: string } | null>(null)
   const connectedAddr = normalizeAddress(account?.address ?? '')
   const routeAddr = normalizeAddress(params.address ?? '')
   const effectiveAddress = routeAddr || connectedAddr
@@ -160,15 +160,18 @@ export default function MyPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  const [createForm, setCreateForm] = useState({ width: '300', height: '250', domainHash: '', reservePrice: '100000000' })
+  const [createForm, setCreateForm] = useState({ width: '300', height: '250', domainHash: '', reservePrice: '0.1' })
   const [pageUrl, setPageUrl] = useState('')
   const [createUpload, setCreateUpload] = useState<{ file: File | null; landingUrl: string }>({ file: null, landingUrl: 'https://example.com' })
+  const [landingTouched, setLandingTouched] = useState(false)
   const [txResult, setTxResult] = useState<any>(null)
   const [creating, setCreating] = useState(false)
   const [loadingOpen, setLoadingOpen] = useState(false)
   const [loadingStep, setLoadingStep] = useState<string>('')
   const [loadingPct, setLoadingPct] = useState<number>(0)
   const [useCustomImage, setUseCustomImage] = useState(false)
+  const [completeOpen, setCompleteOpen] = useState(false)
+  const [completeSlotId, setCompleteSlotId] = useState<string | null>(null)
 
   const addressMismatch = Boolean(routeAddr && connectedAddr && routeAddr !== connectedAddr)
   const canManage = Boolean(effectiveAddress && connectedAddr && effectiveAddress === connectedAddr && !addressMismatch)
@@ -183,7 +186,7 @@ export default function MyPage() {
 
   useEffect(() => {
     if (!effectiveAddress) return
-    j('/api/config').then((c: any) => setCfg({ packageId: c.packageId, moduleName: c.moduleName, network: c.network || 'testnet' })).catch(() => {})
+    j('/api/config').then((c: any) => setCfg({ packageId: c.packageId, moduleName: c.moduleName, network: c.network || 'testnet', protocolId: c.protocolId || '' })).catch(() => {})
     let aborted = false
     setLoading(true)
     j<WalletOverview>(`/api/wallet/${effectiveAddress}/overview`)
@@ -206,6 +209,20 @@ export default function MyPage() {
       aborted = true
     }
   }, [effectiveAddress, reloadKey])
+
+  useEffect(() => {
+    // fetch finance for created slots when overview updates
+    (async () => {
+      try {
+        const ids: string[] = (overview?.created.slots || []).map((s: any) => s.slot.id)
+        const map: any = {}
+        for (const id of ids.slice(0, 50)) {
+          try { map[id] = await j<any>(`/api/slot/${id}/finance`) } catch {}
+        }
+        setFinance(map)
+      } catch {}
+    })()
+  }, [overview])
 
   async function sha256Hex(input: string): Promise<string> {
     const enc = new TextEncoder()
@@ -231,6 +248,10 @@ export default function MyPage() {
       const host = normalizeHost(u.hostname)
       const hex = await sha256Hex(host)
       setCreateForm((f) => ({ ...f, domainHash: `0x${hex}` }))
+      // Default landing URL unless user edited
+      if (!landingTouched) {
+        setCreateUpload((c) => ({ ...c, landingUrl: `http://localhost:5173` }))
+      }
     } catch {
       // ignore
     }
@@ -247,6 +268,7 @@ export default function MyPage() {
 
   const purchasedSlots = overview?.purchased.slots ?? []
   const createdSlots = overview?.created.slots ?? []
+  const [finance, setFinance] = useState<Record<string, { totalMist: string; claimableMist: string; claimedMist: string; availableMist: string }>>({})
 
   const createdSummary = useMemo(() => {
     if (!overview) return { total: '0', pending: '0', deposited: '0' }
@@ -268,7 +290,11 @@ export default function MyPage() {
       if (!cfg) { alert('Config not loaded'); return }
       const tx = new TransactionBlock()
       const [pay] = tx.splitCoins(tx.gas, [tx.pure(String(amount))])
-      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(slot.slot.id), pay] })
+      if (cfg.protocolId) {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid_with_protocol`, arguments: [tx.object(cfg.protocolId), tx.object(slot.slot.id), pay] })
+      } else {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::bid`, arguments: [tx.object(slot.slot.id), pay] })
+      }
       await signAndExecute({ transaction: tx.serialize() })
       triggerReload()
     } catch (err) {
@@ -291,7 +317,11 @@ export default function MyPage() {
       if (!cfg) { alert('Config not loaded'); return }
       const tx = new TransactionBlock()
       const [pay] = tx.splitCoins(tx.gas, [tx.pure(String(amount))])
-      tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental`, arguments: [tx.object(slot.slot.id), pay, tx.pure(secsValue)] })
+      if (cfg.protocolId) {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental_with_protocol`, arguments: [tx.object(cfg.protocolId), tx.object(slot.slot.id), pay, tx.pure(secsValue)] })
+      } else {
+        tx.moveCall({ target: `${cfg.packageId}::${cfg.moduleName}::lock_rental`, arguments: [tx.object(slot.slot.id), pay, tx.pure(secsValue)] })
+      }
       await signAndExecute({ transaction: tx.serialize() })
       triggerReload()
     } catch (err) {
@@ -354,7 +384,17 @@ export default function MyPage() {
       const width = Number(createForm.width || '0')
       const height = Number(createForm.height || '0')
       const domainHashHex = (createForm.domainHash || '').replace(/^0x/, '')
-      const reservePrice = String(createForm.reservePrice || '0')
+      const reservePriceSui = String(createForm.reservePrice || '0')
+      function suiToMist(suiStr: string) {
+        const s = (suiStr || '').trim()
+        if (!s) return '0'
+        if (!/^\d*(?:\.)?\d*$/.test(s)) throw new Error('Invalid SUI amount')
+        const [intPart, fracPartRaw = ''] = s.split('.')
+        const frac = (fracPartRaw + '000000000').slice(0, 9)
+        const mist = BigInt(intPart || '0') * 1_000_000_000n + BigInt(frac || '0')
+        return mist.toString()
+      }
+      const reservePrice = suiToMist(reservePriceSui)
 
       const tx = new TransactionBlock()
       tx.moveCall({
@@ -469,6 +509,8 @@ export default function MyPage() {
       setLoadingPct(100)
       setTimeout(() => setLoadingOpen(false), 400)
       triggerReload()
+      setCompleteSlotId(slotId)
+      setCompleteOpen(true)
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed to create slot.')
       setLoadingOpen(false)
@@ -604,6 +646,9 @@ export default function MyPage() {
                         <div>Slot ID: <span className="font-mono text-xs break-all text-slate-200">{item.slot.id}</span></div>
                         <div>Latest bid: {fmtSui(item.slot.last_price)}</div>
                         <div>Pending: {fmtSui(item.pendingMist)}</div>
+                        {finance[item.slot.id] && (
+                          <div className="text-xs text-slate-400">Claimable: <span className="text-slate-100 font-medium">{fmtSui(finance[item.slot.id].availableMist)}</span> (Total {fmtSui(finance[item.slot.id].totalMist)})</div>
+                        )}
                         <div>Views: <span className="font-semibold text-slate-100">{item.viewStats.views.toLocaleString()}</span></div>
                         {item.latestRental && (
                           <div>Latest activity: {fmtSui(item.latestRental.priceMist)} • {new Date(item.latestRental.ts * 1000).toLocaleString()}</div>
@@ -675,13 +720,13 @@ export default function MyPage() {
                     <input className="input" value={createForm.domainHash} readOnly disabled />
                   </div>
                   <div>
-                    <label className="label">Reserve Price (mist)</label>
+                    <label className="label">Reserve Price (SUI)</label>
                     <input
                       className="input"
                       disabled={!canManage}
-                      inputMode="numeric"
+                      inputMode="decimal"
                       value={createForm.reservePrice}
-                      onChange={(e) => setCreateForm((f) => ({ ...f, reservePrice: e.target.value.replace(/[^0-9]/g, '') }))}
+                      onChange={(e) => setCreateForm((f) => ({ ...f, reservePrice: e.target.value.replace(/[^0-9.]/g, '') }))}
                     />
                   </div>
                   <div className="md:col-span-2 flex items-center gap-2">
@@ -706,7 +751,7 @@ export default function MyPage() {
                       className="input"
                       disabled={!canManage}
                       value={createUpload.landingUrl}
-                      onChange={(e) => setCreateUpload((c) => ({ ...c, landingUrl: e.target.value }))}
+                      onChange={(e) => { setLandingTouched(true); setCreateUpload((c) => ({ ...c, landingUrl: e.target.value })) }}
                     />
                   </div>
                   <div className="md:col-span-2 flex gap-2 pt-2">
@@ -736,6 +781,20 @@ export default function MyPage() {
             <div className="text-sm text-slate-300 mb-3">{loadingStep}</div>
             <div className="w-full h-2 bg-white/10 rounded">
               <div className="h-2 bg-brand-500 rounded" style={{ width: `${loadingPct}%`, transition: 'width .3s ease' }} />
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Completed Modal */}
+      {completeOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setCompleteOpen(false)}>
+          <div className="card max-w-md w-full m-4 p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="text-base font-semibold mb-2">Completed</div>
+            <div className="text-sm text-slate-300 mb-3">Slot creation has been completed.</div>
+            <div className="flex gap-2">
+              <a className="btn-primary" href="/">Go to Marketplace</a>
+              <a className="btn-outline" href="/wallet">Go to My Page</a>
+              <button className="btn-outline" onClick={() => setCompleteOpen(false)}>Close</button>
             </div>
           </div>
         </div>

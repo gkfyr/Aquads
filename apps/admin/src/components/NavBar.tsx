@@ -69,6 +69,15 @@ export default function NavBar() {
                       className="btn-outline !bg-transparent hover:!bg-white/10 w-full justify-start"
                       onClick={() => {
                         setOpen(false);
+                        navigate("/swap");
+                      }}
+                    >
+                      Swap
+                    </button>
+                    <button
+                      className="btn-outline !bg-transparent hover:!bg-white/10 w-full justify-start"
+                      onClick={() => {
+                        setOpen(false);
                         navigate(myPageHref);
                       }}
                     >

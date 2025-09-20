@@ -18,6 +18,7 @@ type Slot = {
   current_renter?: string | null
   domain_hash: string
   created_at?: number
+  rental_expiry?: number
 }
 
 export default function MarketPage() {
@@ -166,6 +167,9 @@ export default function MarketPage() {
                   <span className="text-sm font-medium text-brand-300 hover:underline">Slot • {s.width}×{s.height}</span>
                   <div className="text-sm text-slate-200">{fmtSui(s.last_price)}</div>
                 </div>
+                {s.rental_expiry ? (
+                  <div className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 text-xs border border-amber-400/30">Locked</div>
+                ) : null}
                 <div className="text-xs text-slate-400">Advertiser: <span title={s.current_renter || ''} className="font-mono">{short(s.current_renter)}</span></div>
                 <div className="text-xs text-slate-400">
                   Website: {pages[s.id]

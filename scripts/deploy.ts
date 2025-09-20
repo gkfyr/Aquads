@@ -65,6 +65,15 @@ async function main() {
   if (pkg) {
     console.log('\n[deploy] Package ID:', pkg)
     console.log('Set SUI_PACKAGE_ID in .env to this value.')
+    // Try detect Protocol object from the publish transaction effects (module init runs on publish)
+    const created = ((result as any).effects?.created || []) as Array<any>
+    const prot = created.find((o) => String(o.reference?.objectType || '').endsWith('::Protocol'))?.reference?.objectId
+    if (prot) {
+      console.log('\n[deploy] Protocol ID:', prot)
+      console.log('Set SUI_PROTOCOL_ID in .env to this value.')
+    } else {
+      console.log('[deploy] Protocol object not detected in publish effects. If needed, search the tx in the explorer and look for ::Protocol created objects.')
+    }
   } else {
     console.log('[deploy] Could not automatically detect package id. Check transaction events for Published event.')
   }

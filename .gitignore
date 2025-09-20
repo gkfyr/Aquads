@@ -19,6 +19,41 @@ lerna-debug.log*
 /.next
 /out
 
+# Monorepo workspaces
+apps/*/node_modules/
+apps/*/dist/
+packages/*/node_modules/
+packages/*/dist/
+indexer/node_modules/
+indexer/dist/
+contracts/*/build/
+contracts/*/Move.lock
+
+# Local runtime data / uploads (mock storage)
+indexer/uploads/
+indexer/indexer/uploads/
+indexer/uploads/**
+indexer/indexer/uploads/**
+indexer/prisma/data.db
+
+# Package managers / caches
+.pnpm-store/
+.parcel-cache/
+.vite/
+*.tsbuildinfo
+
+# Coverage / tooling caches
+coverage/
+.nyc_output/
+.eslintcache
+.stylelintcache
+.turbo/
+
+# Misc
+*.log
+tmp/
+temp/
+
 # OS specific files
 .DS_Store
 Thumbs.db
@@ -28,4 +63,3 @@ Thumbs.db
 .idea/
 *.swp
 .cache/
-
